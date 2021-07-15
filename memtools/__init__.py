@@ -3,7 +3,9 @@ import pandas as pd
 
 from memtools.igle import Igle
 from memtools.igleplot import IglePlot
-from memtools.correlation import pdcorr
+from memtools.correlation import pdcorr, correlation
+from memtools.gle_sim import integrate
+from memtools.mfpt import calc_mfpt
 from memtools.flist import flist
 
 
