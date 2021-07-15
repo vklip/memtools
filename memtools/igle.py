@@ -1,6 +1,7 @@
 import os.path
 
 import numpy as np
+from numba import njit
 import pandas as pd
 
 from scipy import interpolate
@@ -27,6 +28,7 @@ class Igle(object):
                  __override_time_check__=False,
                  initial_checks=True,
                  first_order=True,
+                 G_method=True,
                  corrs_from_der=False):
         """
         Create an instance of the Igle class.
@@ -57,6 +59,10 @@ class Igle(object):
             True, the Volterra equation of the second kind can be selected in
             the compute_kernel function. If it is set to False, only the Volerra
             equation of the second kind is used.
+        G_method : bool, default=True
+            Uses the Volterra equation from our PNAS paper 'Non-Markovian Modeling 
+            of Protein Folding' to extract the integral over the kernel. If set 
+            to True, ignores first order bool.
         corrs_from_der : bool, default=False
             Calculate correlation functions from derivatives of the velocity acf.
             (Do not use.)
@@ -85,6 +91,7 @@ class Igle(object):
         self.verbose = verbose
         self.kT = kT
         self.first_order = first_order
+        self.G_method = G_method
         self.corrs_from_der = corrs_from_der
         if self.corrs_from_der:
             print("WARNING: corrs_from_der=True is not properly tested.")
@@ -416,30 +423,33 @@ class Igle(object):
                 print("Mass not calculated.")
             self.compute_mass()
 
-        v_acf = self.corrs["vv"].values
-        va_cf = self.corrs["va"].values
-        dt = self.corrs.index[1] - self.corrs.index[0]
-
-        if first_order:
-            vu_cf = self.ucorr["vu"].values
-        #else: #at the moment
-        a_acf = self.corrs["aa"].values
-        au_cf = self.ucorr["au"].values
-
-        if self.verbose:
-            print("Use dt:", dt)
-
-        kernel = np.zeros(len(v_acf))
-
-        if first_order:
-            ckernel_first_order_core(v_acf, va_cf * self.mass,
-                                     a_acf * self.mass, vu_cf, au_cf, dt, k0,
-                                     kernel)
+        if self.G_method:
+            kernel, ikernel = self.calc_G_method()
         else:
-            ckernel_core(v_acf, va_cf, a_acf * self.mass, au_cf, dt, k0,
-                         kernel)
+            v_acf = self.corrs["vv"].values
+            va_cf = self.corrs["va"].values
+            dt = self.corrs.index[1] - self.corrs.index[0]
 
-        ikernel = cumtrapz(kernel, dx=dt, initial=0.)
+            if first_order:
+                vu_cf = self.ucorr["vu"].values
+            #else: #at the moment
+            a_acf = self.corrs["aa"].values
+            au_cf = self.ucorr["au"].values
+
+            if self.verbose:
+                print("Use dt:", dt)
+
+            kernel = np.zeros(len(v_acf))
+
+            if first_order:
+                ckernel_first_order_core(v_acf, va_cf * self.mass,
+                                        a_acf * self.mass, vu_cf, au_cf, dt, k0,
+                                        kernel)
+            else:
+                ckernel_core(v_acf, va_cf, a_acf * self.mass, au_cf, dt, k0,
+                            kernel)
+
+            ikernel = cumtrapz(kernel, dx=dt, initial=0.)
 
         # yapf: disable
         self.kernel = pd.DataFrame(
@@ -515,3 +525,34 @@ class Igle(object):
             self.dt = self.kernel_1st.index[1] - self.kernel_1st.index[0]
 
         print("Found dt =", self.dt)
+
+    def calc_G_method(self):
+        """ Compute the integral over the kernel. """
+
+        dt = self.corrs.index[1] - self.corrs.index[0]
+        v_acf = self.corrs["vv"].values
+        xu_cf = self.ucorr["xu"].values
+
+        if self.verbose:
+            print("Use dt:", dt)
+
+        ikernel = np.zeros(len(v_acf))
+        _calc_G_method(ikernel, xu_cf, v_acf, dt, verbose=self.verbose)
+        kernel = np.gradient(ikernel, dt)
+        return kernel, ikernel
+
+
+@njit
+def _calc_G_method(kernel_i, xu_cf, v_acf, dt, verbose=False):
+    """ Compute the integral over the kernel. """
+
+    prefac = 2. / v_acf[0]
+    for i in range(1, len(kernel_i)):
+        kernel_i[i] = prefac * (
+            (
+                xu_cf[i] - v_acf[i] * xu_cf[0] / v_acf[0]) / dt 
+                - np.sum(kernel_i[:i] * v_acf[1 : i + 1][::-1]
+            )
+        )
+        if verbose and i % 10000 == 0:
+            print('progress: ', round(i / len(kernel_i) * 100, 3), '%')
