@@ -28,7 +28,7 @@ class Igle(object):
                  __override_time_check__=False,
                  initial_checks=True,
                  first_order=True,
-                 G_method=True,
+                 G_method=False,
                  corrs_from_der=False):
         """
         Create an instance of the Igle class.

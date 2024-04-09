@@ -38,7 +38,7 @@ ckernel_core (PyObject *dummy, PyObject *args)
       Py_XDECREF(va_cf_ar);
       Py_XDECREF(f_acf_ar);
       Py_XDECREF(au_cf_ar);
-      PyArray_XDECREF_ERR(kernel_ar);
+//PyArray_XDECREF_ERR(kernel_ar);
       return NULL;
     }
 
@@ -60,7 +60,7 @@ ckernel_core (PyObject *dummy, PyObject *args)
       Py_XDECREF(va_cf_ar);
       Py_XDECREF(f_acf_ar);
       Py_XDECREF(au_cf_ar);
-      PyArray_XDECREF_ERR(kernel_ar);
+     // PyArray_XDECREF_ERR(kernel_ar);
       return NULL;
     }
 
@@ -132,7 +132,7 @@ ckernel_first_order_core (PyObject *dummy, PyObject *args)
       Py_XDECREF(f_acf_ar);
       Py_XDECREF(vu_cf_ar);
       Py_XDECREF(au_cf_ar);
-      PyArray_XDECREF_ERR(kernel_ar);
+      //PyArray_XDECREF_ERR(kernel_ar);
       return NULL;
     }
 
@@ -156,7 +156,7 @@ ckernel_first_order_core (PyObject *dummy, PyObject *args)
       Py_XDECREF(f_acf_ar);
       Py_XDECREF(vu_cf_ar);
       Py_XDECREF(au_cf_ar);
-      PyArray_XDECREF_ERR(kernel_ar);
+      //PyArray_XDECREF_ERR(kernel_ar);
       return NULL;
     }
 
@@ -248,6 +248,8 @@ initckernel (void)
 {
     #if PY_MAJOR_VERSION >= 3
     import_array();
+          std::cout << "SOMETHING WRONG" << std::endl;
+
     return PyModule_Create(&moduledef);
     #else
     (void)Py_InitModule("ckernel", methods);
